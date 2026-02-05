@@ -11,6 +11,8 @@ import java.io.PrintWriter;
 
 @WebServlet(urlPatterns={"/cookietest"})
 public class CookieTest extends HttpServlet {
+    private static final String githubTokenCookie = "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";
+
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         response.setContentType("text/html");
