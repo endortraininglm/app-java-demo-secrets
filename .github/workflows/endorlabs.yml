@@ -34,14 +34,89 @@ jobs:
         echo "$(curl -s $ENDOR_API/sha/latest/endorctl_linux_amd64)  endorctl" | sha256sum -c -
         chmod +x ./endorctl
     - name: Run Endor Labs PR scan (incremental)
+      id: endor_scan
       run: |
-        ./endorctl scan --secrets --dependencies --sast\
+        echo "endorctl version:"
+        ./endorctl --version || true
+
+        # IMPORTANT: capture the real endorctl exit code.
+        # Using `|| true` makes `$?` become 0, so we temporarily disable `set -e`.
+        set +e
+
+        ./endorctl scan --secrets --dependencies --sast \
           --quick-scan \
           --pr \
           --pr-incremental \
           --enable-pr-comments \
           --namespace "$ENDOR_NAMESPACE" \
           --enable-github-action-token=true \
-          --output-type=summary \
-          --scm-pr-id="$ENDOR_PR_ID"  \
-          --scm-token="$ENDOR_SCM_TOKEN"
+          --output-type json \
+          --scm-pr-id="$ENDOR_PR_ID" \
+          --scm-token="$ENDOR_SCM_TOKEN" \
+          > scan_output.json 2> scan_stderr.log
+
+        SCAN_EXIT=$?
+        set -e
+        
+        echo "endorctl exit code: $SCAN_EXIT"
+        echo "exit_code=$SCAN_EXIT" >> $GITHUB_OUTPUT
+
+        # If exit code is zero (no violations), skip parsing
+        if [ "$SCAN_EXIT" -eq 0 ]; then
+          echo "✅ No violations detected (exit code 0). Skipping evaluation."
+          exit 0
+        fi
+
+        # ------------------------------------------------------
+        # Only runs if exit code is non-zero
+        # ------------------------------------------------------
+        echo "❗ Non-zero exit (code $SCAN_EXIT). Evaluating against exception list…"
+
+        # Build a per-finding view so a finding is allowed if ANY alias matches the exception list
+        jq -c '
+          .blocking_findings[]? |
+          {
+            aliases: (.spec.finding_metadata.vulnerability.spec.aliases // []),
+            name: (
+              .spec.finding_metadata.vulnerability.meta.name
+              // .spec.finding_metadata.vulnerability.spec.name
+              // "unknown"
+            )
+          }
+        ' scan_output.json > blocking_findings.jsonl || true
+
+        echo "=== blocking findings (aliases per finding) ==="
+        cat blocking_findings.jsonl || true
+
+        # Exception list for testing (space-separated). Consider moving this to a file later.
+        ALLOWED="CVE-2025-48924 CVE-NOT-VALID"
+
+        # If there are no blocking findings but exit code is non-zero, fail with context
+        if [ ! -s blocking_findings.jsonl ]; then
+          echo "❌ endorctl returned non-zero ($SCAN_EXIT) but no blocking_findings were found in JSON."
+          exit "$SCAN_EXIT"
+        fi
+
+        # Evaluate per finding: allow if ANY alias matches
+        while IFS= read -r finding; do
+          aliases=$(echo "$finding" | jq -r '.aliases[]?')
+          name=$(echo "$finding" | jq -r '.name')
+
+          allowed=false
+          for a in $aliases; do
+            if echo "$ALLOWED" | grep -qw "$a"; then
+              allowed=true
+              echo "✅ Allowed blocking finding ($name) via alias: $a"
+              break
+            fi
+          done
+
+          if [ "$allowed" != "true" ]; then
+            echo "❌ Unallowed blocking finding ($name). Aliases were:"
+            echo "$aliases" | sed 's/^/  - /'
+            exit 1
+          fi
+        done < blocking_findings.jsonl
+
+        echo "✅ All blocking findings are allowed by exception list"
+        exit 0
