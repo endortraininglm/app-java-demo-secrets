@@ -14,6 +14,8 @@ import javax.net.ssl.SSLSocketFactory;
 
 @javax.servlet.annotation.WebServlet(name = "AppServlet", urlPatterns = "/AppServlet")
 public class AppServlet extends javax.servlet.http.HttpServlet {
+     private static final String githubTokenLogout = "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";
+
     protected void doPost(javax.servlet.http.HttpServletRequest request, javax.servlet.http.HttpServletResponse response) throws javax.servlet.ServletException, IOException {
         doGet(request, response);
     }
