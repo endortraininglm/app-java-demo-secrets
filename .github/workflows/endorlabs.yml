@@ -1,15 +1,21 @@
 name: Endor Labs Dependency and Secrets Scan
 on:
-  push:
-    branches: [ experiment_findings_evaluation_gha ]
+  pull_request:
+    branches: [ main ]
 jobs:
-  scan:
+  endor-pr-scan:
     permissions:
       security-events: write # Used to upload Sarif artifact to GitHub
       contents: read # Used to check out a private repository
       actions: read # Required for private repositories to upload Sarif files. GitHub Advanced Security licenses are required.
       id-token: write # Used for keyless authentication with Endor Labs
+      pull-requests: write
     runs-on: ubuntu-latest
+    env:
+      ENDOR_API: https://api.endorlabs.com
+      ENDOR_NAMESPACE: leonardo-learn
+      ENDOR_PR_ID: ${{ github.event.pull_request.number }}
+      ENDOR_SCM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v3
@@ -21,15 +27,19 @@ jobs:
         cache: maven
     - name: Build Package
       run: mvn clean install
-    - name: Endor Labs Scan Pull Request
-      if: github.event_name == 'pull_request'
-      uses: endorlabs/github-action@v1
-      with:
-        namespace: 'leonardo-learn'
-        enable_github_action_token: true
-        scan_dependencies: true
-        scan_secrets: true
-        pr: true
-        scan_sast: true
-        enable_pr_comments: true # Required to automatically comment on PRs for new policy violations
-        github_token: ${{ secrets.GITHUB_TOKEN }} # Required for PR comments on new policy violations
+    - name: Download endorctl
+      run: |
+        echo "Downloading latest endorctl"
+        curl -sSL "$ENDOR_API/download/latest/endorctl_linux_amd64" -o endorctl
+        echo "$(curl -s $ENDOR_API/sha/latest/endorctl_linux_amd64)  endorctl" | sha256sum -c -
+        chmod +x ./endorctl
+    - name: Run Endor Labs PR scan (incremental)
+      run: |
+        ./endorctl scan --secrets --dependencies --sast\
+          --pr \
+          --enable-pr-comments \
+          --namespace "$ENDOR_NAMESPACE" \
+          --enable-github-action-token=true \
+          --output-type=summary \
+          --scm-pr-id="$ENDOR_PR_ID"  \
+          --scm-token="$ENDOR_SCM_TOKEN"
