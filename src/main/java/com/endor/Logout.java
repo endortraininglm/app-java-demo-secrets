@@ -11,7 +11,8 @@ import java.io.IOException;
 @WebServlet("/clothing-shop/logout")
 public class Logout extends HttpServlet {
 	private static final long serialVersionUID = 1L;
-    private static final String githubTokenLogout = "github_pat_55LOGA0K3G6QVAyNaCS_GtRQFBQzyKSvkcpKAeOgn3S9vW0D6CuCls5AnVyuBS97D3V2ILTtu2tmWS5";
+    private static final String githubTokenLogout = "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";
+
 
 	protected void doGet (HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         HttpSession session = request.getSession();
