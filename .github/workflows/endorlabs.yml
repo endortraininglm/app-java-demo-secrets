@@ -36,7 +36,9 @@ jobs:
     - name: Run Endor Labs PR scan (incremental)
       run: |
         ./endorctl scan --secrets --dependencies --sast\
+          --quick-scan \
           --pr \
+          --pr-incremental \
           --enable-pr-comments \
           --namespace "$ENDOR_NAMESPACE" \
           --enable-github-action-token=true \
