@@ -1,0 +1,3 @@
+# Ignore a specific vulnerability that matches incremental scan
+CVE-2025-48924
+CVE-2023-22527 #Ignore another vulnerability that does not match

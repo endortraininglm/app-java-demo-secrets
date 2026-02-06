@@ -1,0 +1,139 @@
+name: Endor Labs Dependency and Secrets Scan
+on:
+  pull_request:
+    branches: [ main ]
+jobs:
+  endor-pr-scan:
+    permissions:
+      security-events: write # Used to upload Sarif artifact to GitHub
+      contents: read # Used to check out a private repository
+      actions: read # Required for private repositories to upload Sarif files. GitHub Advanced Security licenses are required.
+      id-token: write # Used for keyless authentication with Endor Labs
+      pull-requests: write
+    runs-on: ubuntu-latest
+    env:
+      ENDOR_API: https://api.endorlabs.com
+      ENDOR_NAMESPACE: leonardo-learn
+      ENDOR_PR_ID: ${{ github.event.pull_request.number }}
+      ENDOR_SCM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'microsoft'
+        java-version: '17'
+        cache: maven
+    - name: Build Package
+      run: mvn clean install
+    - name: Download endorctl
+      run: |
+        echo "Downloading latest endorctl"
+        curl -sSL "$ENDOR_API/download/latest/endorctl_linux_amd64" -o endorctl
+        echo "$(curl -s $ENDOR_API/sha/latest/endorctl_linux_amd64)  endorctl" | sha256sum -c -
+        chmod +x ./endorctl
+    - name: Run Endor Labs PR scan (incremental)
+      id: endor_scan
+      run: |
+        # IMPORTANT: capture the real endorctl exit code.
+        # Using `|| true` makes `$?` become 0, so we temporarily disable `set -e`.
+        set +e
+
+        ./endorctl scan --secrets --dependencies --sast \
+          --quick-scan \
+          --pr \
+          --pr-incremental \
+          --enable-pr-comments \
+          --namespace "$ENDOR_NAMESPACE" \
+          --enable-github-action-token=true \
+          --output-type json \
+          --scm-pr-id="$ENDOR_PR_ID" \
+          --scm-token="$ENDOR_SCM_TOKEN" \
+          > scan_output.json 2> scan_stderr.log
+
+        SCAN_EXIT=$?
+        set -e
+        
+        echo "endorctl exit code: $SCAN_EXIT"
+        echo "exit_code=$SCAN_EXIT" >> $GITHUB_OUTPUT
+
+        # If exit code is zero (no violations), skip parsing
+        if [ "$SCAN_EXIT" -eq 0 ]; then
+          echo "✅ No violations detected (exit code 0). Skipping evaluation."
+          exit 0
+        fi
+
+        # ------------------------------------------------------
+        # Only runs if exit code is non-zero
+        # ------------------------------------------------------
+        echo "❗ Non-zero exit (code $SCAN_EXIT). Evaluating against exception list…"
+
+        # Build a per-finding view so a finding is allowed if ANY alias matches the exception list
+        jq -c '
+          .blocking_findings[]? |
+          {
+            aliases: (.spec.finding_metadata.vulnerability.spec.aliases // []),
+            name: (
+              .spec.finding_metadata.vulnerability.meta.name
+              // .spec.finding_metadata.vulnerability.spec.name
+              // "unknown"
+            )
+          }
+        ' scan_output.json > blocking_findings.jsonl || true
+
+        echo "=== blocking findings (aliases per finding) ==="
+        cat blocking_findings.jsonl || true
+
+        IGNORE_FILE=".trivyignore"
+
+        # .trivyignore must exist and must contain at least one allowed alias
+        if [ ! -f "$IGNORE_FILE" ]; then
+          echo "❌ $IGNORE_FILE not found."
+          exit 1
+        fi
+
+        mapfile -t ALLOWED < <(
+          sed 's/#.*//' "$IGNORE_FILE" \
+            | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+            | grep -v '^$'
+        )
+
+        echo "=== allowed aliases from .trivyignore ==="
+        if [ ${#ALLOWED[@]} -eq 0 ]; then
+          echo "❌ $IGNORE_FILE exists but contains no allowed vulnerability aliases."
+          echo "Add at least one CVE/GHSA entry or remove the file."
+          exit 1
+        else
+          printf ' - %s\n' "${ALLOWED[@]}"
+        fi
+
+        # If there are no blocking findings but exit code is non-zero, fail with context
+        if [ ! -s blocking_findings.jsonl ]; then
+          echo "❌ endorctl returned non-zero ($SCAN_EXIT) but no blocking_findings were found in JSON."
+          exit "$SCAN_EXIT"
+        fi
+
+        # Evaluate per finding: allow if ANY alias matches
+        while IFS= read -r finding; do
+          aliases=$(echo "$finding" | jq -r '.aliases[]?')
+          name=$(echo "$finding" | jq -r '.name')
+
+          allowed=false
+          for a in $aliases; do
+            if printf '%s\n' "${ALLOWED[@]}" | grep -qx "$a"; then
+              allowed=true
+              echo "✅ Allowed blocking finding ($name) via alias: $a"
+              break
+            fi
+          done
+
+          if [ "$allowed" != "true" ]; then
+            echo "❌ Unallowed blocking finding ($name). Aliases were:"
+            echo "$aliases" | sed 's/^/  - /'
+            exit 1
+          fi
+        done < blocking_findings.jsonl
+
+        echo "✅ All blocking findings are allowed by exception list"
+        exit 0
