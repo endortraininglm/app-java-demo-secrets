@@ -88,7 +88,7 @@ jobs:
         echo "=== blocking findings (aliases per finding) ==="
         cat blocking_findings.jsonl || true
 
-        IGNORE_FILE=".trivyignore2"
+        IGNORE_FILE=".trivyignore"
 
         # .trivyignore must exist and must contain at least one allowed alias
         if [ ! -f "$IGNORE_FILE" ]; then
