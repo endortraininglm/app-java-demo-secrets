@@ -36,9 +36,6 @@ jobs:
     - name: Run Endor Labs PR scan (incremental)
       id: endor_scan
       run: |
-        echo "endorctl version:"
-        ./endorctl --version || true
-
         # IMPORTANT: capture the real endorctl exit code.
         # Using `|| true` makes `$?` become 0, so we temporarily disable `set -e`.
         set +e
