@@ -1,3 +1,2 @@
 # Ignore a specific vulnerability
-CVE-2025-48924
-GHSA-j288-q9x7-2f5v #Ignore another vulnerability
+# Ignore another vulnerability
