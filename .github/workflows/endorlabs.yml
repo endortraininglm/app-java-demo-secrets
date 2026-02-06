@@ -88,8 +88,26 @@ jobs:
         echo "=== blocking findings (aliases per finding) ==="
         cat blocking_findings.jsonl || true
 
-        # Exception list for testing (space-separated). Consider moving this to a file later.
-        ALLOWED="CVE-2025-48924 CVE-NOT-VALID"
+        # Exception list: read allowed vulnerability aliases from .trivyignore at repo root.
+        # Supports full-line and inline comments using '#', trims whitespace, ignores blank lines.
+        IGNORE_FILE=".trivyignore"
+        if [ ! -f "$IGNORE_FILE" ]; then
+          echo "ℹ️ No $IGNORE_FILE found at repo root. Proceeding with empty allowlist."
+          ALLOWED=()
+        else
+          mapfile -t ALLOWED < <(
+            sed 's/#.*//' "$IGNORE_FILE" \
+              | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+              | grep -v '^$'
+          )
+        fi
+
+        echo "=== allowed aliases from .trivyignore ==="
+        if [ ${#ALLOWED[@]} -eq 0 ]; then
+          echo "(none)"
+        else
+          printf ' - %s\n' "${ALLOWED[@]}"
+        fi
 
         # If there are no blocking findings but exit code is non-zero, fail with context
         if [ ! -s blocking_findings.jsonl ]; then
@@ -104,7 +122,7 @@ jobs:
 
           allowed=false
           for a in $aliases; do
-            if echo "$ALLOWED" | grep -qw "$a"; then
+            if printf '%s\n' "${ALLOWED[@]}" | grep -qx "$a"; then
               allowed=true
               echo "✅ Allowed blocking finding ($name) via alias: $a"
               break
