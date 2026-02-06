@@ -88,23 +88,25 @@ jobs:
         echo "=== blocking findings (aliases per finding) ==="
         cat blocking_findings.jsonl || true
 
-        # Exception list: read allowed vulnerability aliases from .trivyignore at repo root.
-        # Supports full-line and inline comments using '#', trims whitespace, ignores blank lines.
-        IGNORE_FILE=".trivyignore"
+        IGNORE_FILE=".trivyignore2"
+
+        # .trivyignore must exist and must contain at least one allowed alias
         if [ ! -f "$IGNORE_FILE" ]; then
-          echo "ℹ️ No $IGNORE_FILE found at repo root. Proceeding with empty allowlist."
-          ALLOWED=()
-        else
-          mapfile -t ALLOWED < <(
-            sed 's/#.*//' "$IGNORE_FILE" \
-              | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
-              | grep -v '^$'
-          )
+          echo "❌ $IGNORE_FILE not found."
+          exit 1
         fi
+
+        mapfile -t ALLOWED < <(
+          sed 's/#.*//' "$IGNORE_FILE" \
+            | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+            | grep -v '^$'
+        )
 
         echo "=== allowed aliases from .trivyignore ==="
         if [ ${#ALLOWED[@]} -eq 0 ]; then
-          echo "(none)"
+          echo "❌ $IGNORE_FILE exists but contains no allowed vulnerability aliases."
+          echo "Add at least one CVE/GHSA entry or remove the file."
+          exit 1
         else
           printf ' - %s\n' "${ALLOWED[@]}"
         fi
