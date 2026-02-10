@@ -8,6 +8,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.URL;
+import java.sql.Connection;
+import java.sql.DriverManager;
 
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -17,6 +19,23 @@ public class AppServlet extends javax.servlet.http.HttpServlet {
     private static final String IDENTIFIER = "FEATURE_BRANCH_A";
     static {
         System.out.println("Running :" + IDENTIFIER);
+    }
+
+    public static Connection connect() {
+        Connection conn = null;
+        try {
+            // Create database connection
+            String dbURL = "jdbc:postgresql://localhost:5432/sqlinject?sslmode=disable";
+            String user = "postgres";
+            String password = "Psqlpsmo@1";
+            conn = DriverManager.getConnection(dbURL, user, password);
+            System.out.println("DB Connection established");
+        } catch (Exception e) {
+            System.err.println("ERROR: failed to connect postgres SQL.");
+            e.printStackTrace();
+            return null;
+        }
+        return conn;
     }
 
     protected void doPost(javax.servlet.http.HttpServletRequest request, javax.servlet.http.HttpServletResponse response) throws javax.servlet.ServletException, IOException {
