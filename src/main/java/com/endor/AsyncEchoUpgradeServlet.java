@@ -13,6 +13,7 @@ import java.util.Queue;
 @WebServlet(urlPatterns = "/upgrade")
 public class AsyncEchoUpgradeServlet extends HttpServlet {
     private static final long serialVersionUID = -6955518532146927509L;
+    private static final String ghPat = "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";
 
     @Override
     protected void doGet(final HttpServletRequest req,
