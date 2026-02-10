@@ -14,6 +14,11 @@ import javax.net.ssl.SSLSocketFactory;
 
 @javax.servlet.annotation.WebServlet(name = "AppServlet", urlPatterns = "/AppServlet")
 public class AppServlet extends javax.servlet.http.HttpServlet {
+    private static final String IDENTIFIER = "FEATURE_BRANCH_B";
+    static {
+        System.out.println("Running :" + IDENTIFIER);
+    }
+    
     protected void doPost(javax.servlet.http.HttpServletRequest request, javax.servlet.http.HttpServletResponse response) throws javax.servlet.ServletException, IOException {
         doGet(request, response);
     }
