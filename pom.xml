@@ -15,6 +15,31 @@
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
 	</properties>
+	<!--
+	  Secrets-scan test profile.
+	  This profile is NOT activated by default, so it should not affect Maven builds.
+	  It intentionally contains:
+	    (A) an env-var based "dynamic" secret reference, and
+	    (B) a literal control value that should be easier for secret scanners to flag.
+	  NOTE: example.invalid is a reserved non-routable domain used for test data.
+	-->
+	<profiles>
+		<profile>
+			<id>endor-secrets-scan-test</id>
+			<repositories>
+				<!-- Test A: dynamic secret reference via env var -->
+				<repository>
+					<id>fake-test-repo-env</id>
+					<url>https://user:${env.FAKE_MAVEN_PASSWORD}@example.invalid/maven</url>
+				</repository>
+				<!-- Test B: literal control -->
+				<repository>
+					<id>fake-test-repo-literal</id>
+					<url>https://user:EndorLabs_Test_NotARealSecret_123456@example.invalid/maven</url>
+				</repository>
+			</repositories>
+		</profile>
+	</profiles>
 	<dependencies>
 		<dependency>
 			<groupId>javax.servlet</groupId>

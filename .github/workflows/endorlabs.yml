@@ -1,0 +1,65 @@
+name: Endor Labs Dependency and Secrets Scan
+on:
+  pull_request:
+    branches: [ main ]
+jobs:
+  endor-pr-scan:
+    permissions:
+      security-events: write # Used to upload Sarif artifact to GitHub
+      contents: read # Used to check out a private repository
+      actions: read # Required for private repositories to upload Sarif files. GitHub Advanced Security licenses are required.
+      id-token: write # Used for keyless authentication with Endor Labs
+      pull-requests: write
+    runs-on: ubuntu-latest
+    env:
+      ENDOR_API: https://api.endorlabs.com
+      ENDOR_NAMESPACE: leonardo-learn
+      ENDOR_PR_ID: ${{ github.event.pull_request.number }}
+      ENDOR_SCM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      FAKE_MAVEN_PASSWORD: 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
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'microsoft'
+        java-version: '17'
+        cache: maven
+    - name: Build Package
+      run: mvn clean install
+    - name: Download endorctl
+      run: |
+        echo "Downloading latest endorctl"
+        curl -sSL "$ENDOR_API/download/latest/endorctl_linux_amd64" -o endorctl
+        echo "$(curl -s $ENDOR_API/sha/latest/endorctl_linux_amd64)  endorctl" | sha256sum -c -
+        chmod +x ./endorctl
+    - name: Run Endor Labs PR scan (incremental)
+      id: endor_scan
+      run: |
+        # IMPORTANT: capture the real endorctl exit code.
+        # Using `|| true` makes `$?` become 0, so we temporarily disable `set -e`.
+        set +e
+
+        ./endorctl scan --secrets --secrets \
+          --enable-pr-comments \
+          --namespace "$ENDOR_NAMESPACE" \
+          --enable-github-action-token=true \
+          --output-type json \
+          --scm-pr-id="$ENDOR_PR_ID" \
+          --scm-token="$ENDOR_SCM_TOKEN" \
+          > scan_output.json 2> scan_stderr.log
+
+        SCAN_EXIT=$?
+        set -e
+        
+        echo "endorctl exit code: $SCAN_EXIT"
+        echo "exit_code=$SCAN_EXIT" >> $GITHUB_OUTPUT
+
+        # If exit code is zero (no violations), skip parsing
+        if [ "$SCAN_EXIT" -eq 0 ]; then
+          echo "✅ No violations detected (exit code 0). Skipping evaluation."
+          exit 0
+        fi
+
+        exit "$SCAN_EXIT"
