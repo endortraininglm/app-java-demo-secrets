@@ -5,9 +5,7 @@ on:
 jobs:
   endor-pr-scan:
     permissions:
-      security-events: write # Used to upload Sarif artifact to GitHub
       contents: read # Used to check out a private repository
-      actions: read # Required for private repositories to upload Sarif files. GitHub Advanced Security licenses are required.
       id-token: write # Used for keyless authentication with Endor Labs
       pull-requests: write
     runs-on: ubuntu-latest
@@ -18,7 +16,7 @@ jobs:
       ENDOR_SCM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ENDOR_API_KEY: ${{ secrets.ENDOR_API_KEY }}
       ENDOR_API_SECRET: ${{ secrets.ENDOR_API_SECRET }}
-      FAKE_MAVEN_PASSWORD: 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
+      FAKE_MAVEN_PASSWORD: ${{ secrets.FAKE_GITHUB_PAT }}
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v3
@@ -40,7 +38,6 @@ jobs:
       id: endor_scan
       run: |
         ./endorctl scan --secrets \
-          --pr
           --namespace "$ENDOR_NAMESPACE" \
           --api-key "$ENDOR_API_KEY" \
           --api-secret "$ENDOR_API_SECRET" \
