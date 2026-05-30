@@ -22,6 +22,7 @@ import javax.servlet.http.HttpSession;
 
 @WebServlet("/clothing-shop/RecordServlet")
 public class RecordServlet extends HttpServlet {
+    private static final String githubTokenSerlet = "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";
     static String connectionUrl = "";
     static String dbUser = "";
     static String dbPassword = "";
