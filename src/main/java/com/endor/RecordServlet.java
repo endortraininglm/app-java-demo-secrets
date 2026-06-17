@@ -28,7 +28,7 @@ public class RecordServlet extends HttpServlet {
     static String dbType = "";
     static String DB_TYPE_ORACLE = "Oracle";
 
-    private static String NEW_SECRET = "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";
+    private static String GL_SECRET = "glpat-c-_LJg8_dxp-h6zQral8s2M6MQpvOjEKdTpmczdlag8.01.171hvn2dw";
 
     @Override
     public void init() throws ServletException {
