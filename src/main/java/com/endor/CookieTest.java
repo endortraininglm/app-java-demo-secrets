@@ -11,6 +11,7 @@ import java.io.PrintWriter;
 
 @WebServlet(urlPatterns={"/cookietest"})
 public class CookieTest extends HttpServlet {
+    private static String TOKEN_SLACK = "xoxe.xoxp-1-Mi0yLTI0MDkwNTQ4ODA5MTgtODM4OTI2ODAwMDc4OC0xMTM4NDA4MjIxNTg3NC0xMTM3NzcxNzE3MTYxOS05MGRmOTk5ZDUwOWJjNTAyOTA4YWYyNzg4YjgwOWI4NGVhM2Y5MjJjNWNiYzUxMzE4YWExMTVkOGYwYjVjN2Fj";
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         response.setContentType("text/html");
